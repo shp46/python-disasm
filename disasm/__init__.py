@@ -30,15 +30,16 @@ import json
 import re
 import dis
 import marshal
+import time
 import io
 import os
 from opcode import *
+import struct
+from importlib.util import MAGIC_NUMBER
 
-vers = sys.version_info[:2]
-if vers != (3, 10):
+if sys.version_info[:2] != (3, 10):
 	exit("Only For Python3.10 ")
 
-MAGIC = b'U\r\r\n\x00\x00\x00\x00_\x86\x8bb\x00\x00\x00\x00'
 cmp_op = ('<', '<=', '==', '!=', '>', '>=', 'in', 'not in', 'is', 'is not', 'exception match', 'BAD')
 opmap38 = {'POP_TOP': 1, 'ROT_TWO': 2, 'ROT_THREE': 3, 'DUP_TOP': 4, 'DUP_TOP_TWO': 5, 'ROT_FOUR': 6, 'NOP': 9, 'UNARY_POSITIVE': 10, 'UNARY_NEGATIVE': 11, 'UNARY_NOT': 12, 'UNARY_INVERT': 15, 'BINARY_MATRIX_MULTIPLY': 16, 'INPLACE_MATRIX_MULTIPLY': 17, 'BINARY_POWER': 19, 'BINARY_MULTIPLY': 20, 'BINARY_MODULO': 22, 'BINARY_ADD': 23, 'BINARY_SUBTRACT': 24, 'BINARY_SUBSCR': 25, 'BINARY_FLOOR_DIVIDE': 26, 'BINARY_TRUE_DIVIDE': 27, 'INPLACE_FLOOR_DIVIDE': 28, 'INPLACE_TRUE_DIVIDE': 29, 'GET_AITER': 50, 'GET_ANEXT': 51, 'BEFORE_ASYNC_WITH': 52, 'BEGIN_FINALLY': 53, 'END_ASYNC_FOR': 54, 'INPLACE_ADD': 55, 'INPLACE_SUBTRACT': 56, 'INPLACE_MULTIPLY': 57, 'INPLACE_MODULO': 59, 'STORE_SUBSCR': 60, 'DELETE_SUBSCR': 61, 'BINARY_LSHIFT': 62, 'BINARY_RSHIFT': 63, 'BINARY_AND': 64, 'BINARY_XOR': 65, 'BINARY_OR': 66, 'INPLACE_POWER': 67, 'GET_ITER': 68, 'GET_YIELD_FROM_ITER': 69, 'PRINT_EXPR': 70, 'LOAD_BUILD_CLASS': 71, 'YIELD_FROM': 72, 'GET_AWAITABLE': 73, 'INPLACE_LSHIFT': 75, 'INPLACE_RSHIFT': 76, 'INPLACE_AND': 77, 'INPLACE_XOR': 78, 'INPLACE_OR': 79, 'WITH_CLEANUP_START': 81, 'WITH_CLEANUP_FINISH': 82, 'RETURN_VALUE': 83, 'IMPORT_STAR': 84, 'SETUP_ANNOTATIONS': 85, 'YIELD_VALUE': 86, 'POP_BLOCK': 87, 'END_FINALLY': 88, 'POP_EXCEPT': 89, 'STORE_NAME': 90, 'DELETE_NAME': 91, 'UNPACK_SEQUENCE': 92, 'FOR_ITER': 93, 'UNPACK_EX': 94, 'STORE_ATTR': 95, 'DELETE_ATTR': 96, 'STORE_GLOBAL': 97, 'DELETE_GLOBAL': 98, 'LOAD_CONST': 100, 'LOAD_NAME': 101, 'BUILD_TUPLE': 102, 'BUILD_LIST': 103, 'BUILD_SET': 104, 'BUILD_MAP': 105, 'LOAD_ATTR': 106, 'COMPARE_OP': 107, 'IMPORT_NAME': 108, 'IMPORT_FROM': 109, 'JUMP_FORWARD': 110, 'JUMP_IF_FALSE_OR_POP': 111, 'JUMP_IF_TRUE_OR_POP': 112, 'JUMP_ABSOLUTE': 113, 'POP_JUMP_IF_FALSE': 114, 'POP_JUMP_IF_TRUE': 115, 'LOAD_GLOBAL': 116, 'SETUP_FINALLY': 122, 'LOAD_FAST': 124, 'STORE_FAST': 125, 'DELETE_FAST': 126, 'RAISE_VARARGS': 130, 'CALL_FUNCTION': 131, 'MAKE_FUNCTION': 132, 'BUILD_SLICE': 133, 'LOAD_CLOSURE': 135, 'LOAD_DEREF': 136, 'STORE_DEREF': 137, 'DELETE_DEREF': 138, 'CALL_FUNCTION_KW': 141, 'CALL_FUNCTION_EX': 142, 'SETUP_WITH': 143, 'LIST_APPEND': 145, 'SET_ADD': 146, 'MAP_ADD': 147, 'LOAD_CLASSDEREF': 148, 'EXTENDED_ARG': 144, 'BUILD_LIST_UNPACK': 149, 'BUILD_MAP_UNPACK': 150, 'BUILD_MAP_UNPACK_WITH_CALL': 151, 'BUILD_TUPLE_UNPACK': 152, 'BUILD_SET_UNPACK': 153, 'SETUP_ASYNC_WITH': 154, 'FORMAT_VALUE': 155, 'BUILD_CONST_KEY_MAP': 156, 'BUILD_STRING': 157, 'BUILD_TUPLE_UNPACK_WITH_CALL': 158, 'LOAD_METHOD': 160, 'CALL_METHOD': 161, 'CALL_FINALLY': 162, 'POP_FINALLY': 163}
 
@@ -47,12 +48,17 @@ globals().update(opmap)
 _OPNAME_WIDTH = 20
 _OPARG_WIDTH = 5
 
-def c_to_pyc(x,y,msg=False):
-	B = MAGIC + marshal.dumps(x)
-	with open(y,"wb") as f:
-		f.write(B)
+def c_to_pyc(co, files, msg=False):
+	xa=(lambda val: struct.pack("<I", val))
+	data = bytearray(MAGIC_NUMBER)
+	data.extend(xa(0))
+	data.extend(xa(int(time.time())))
+	data.extend(xa(0))
+	data.extend(marshal.dumps(co))
+	with open(files, "wb") as self:
+		self.write(data)
 	if msg:
-		print("Write %s" % y)
+		print(f"Write {files}")
 
 def iscode(co):
 	return hasattr(co, "co_code")
@@ -69,13 +75,9 @@ class Code():
 			if loop.startswith("co_"):
 				setattr(self, loop, getattr(co, loop))
 		self.co_consts = list(self.co_consts)
-		self.co_names = list(self.co_names)
-		self.co_varnames = list(self.co_varnames)
 	def asm(self):
 		sp = ("argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars")
 		self.co_consts = tuple(self.co_consts)
-		self.co_names = tuple(self.co_names)
-		self.co_varnames = tuple(self.co_varnames)
 		opcodes = sp.split(", ")
 		for rangee, loop in enumerate(opcodes):
 			code = getattr(self, "co_%s" % loop)
@@ -250,10 +252,9 @@ def load_code(sc):
 			try:
 				bit.append(int(x))
 			except:
-				raise Exception("Error \"%s %d\" in range %d"%(i.opname, i.arg, lop))
+				raise Exception("Error \"%s %s\" in range %s"%(str(i.opname), str(i.arg), str(lop)))
 	lnotab = ''
 	return lnotab, bytes(bit)
-	
 def get_code_obj(stream):
 	s = stream.split("Disassembly")[0]
 	xa = re.search("module\((.*?)\)",s).group(1)
