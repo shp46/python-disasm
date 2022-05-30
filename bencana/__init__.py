@@ -22,8 +22,8 @@
 
 # Untuk selebih nya tinggal benerin atau tambahin sendiri aja
 
-# Kalo Ada saran perbaikan ataupun mau bikin Repo Barengan
-# dm aja ke wa gw Bro https://bit.ly/jcango
+# Kalo Ada saran perbaikan ataupun bugs di sc ini silahkan Dm ke wa gw aja bro
+# Dan jangan spam ya ajg:c
 
 import sys
 import json
